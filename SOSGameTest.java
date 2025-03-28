@@ -1,327 +1,137 @@
-import static org.junit.Assert.*;
-import org.junit.Before;
-import org.junit.Test;
-import javax.swing.JButton;
-import javax.swing.JLabel;
-import javax.swing.JRadioButton;
-import java.awt.Color;
-import java.awt.Component;
-import java.lang.reflect.Field;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
 
+import javax.swing.*;
+import java.awt.event.ActionEvent;
 
-class TestableGameFrame extends GameFrame {
-    public TestableGameFrame() {
-        super();
-    }
-    
-    public JRadioButton getBlueS() {
-        try {
-            Field field = GameFrame.class.getDeclaredField("blueS");
-            field.setAccessible(true);
-            return (JRadioButton) field.get(this);
-        } catch (Exception e) {
-            throw new RuntimeException("Could not access blueS field", e);
-        }
-    }
-    
-    public JRadioButton getBlueO() {
-        try {
-            Field field = GameFrame.class.getDeclaredField("blueO");
-            field.setAccessible(true);
-            return (JRadioButton) field.get(this);
-        } catch (Exception e) {
-            throw new RuntimeException("Could not access blueO field", e);
-        }
-    }
-    
-    public JRadioButton getRedS() {
-        try {
-            Field field = GameFrame.class.getDeclaredField("redS");
-            field.setAccessible(true);
-            return (JRadioButton) field.get(this);
-        } catch (Exception e) {
-            throw new RuntimeException("Could not access redS field", e);
-        }
-    }
-    
-    public JRadioButton getRedO() {
-        try {
-            Field field = GameFrame.class.getDeclaredField("redO");
-            field.setAccessible(true);
-            return (JRadioButton) field.get(this);
-        } catch (Exception e) {
-            throw new RuntimeException("Could not access redO field", e);
-        }
-    }
-}
- 
 public class SOSGameTest {
-    private GameFrame frame;
-    
-    @Before
-    public void setUp() {
-        frame = new TestableGameFrame();
-    }
-    
-    @Test
-    public void testChooseBoardSizeValid() {
-        frame.boardSizeField.setText("6");
-        frame.startNewGame();
-        
-        assertEquals(6, getFieldValue(frame, "boardSize"));
-        
-        GameFrame.GameBoard gameBoard = (GameFrame.GameBoard) getFieldValue(frame, "gameBoard");
-        JButton[][] buttons = (JButton[][]) getFieldValue(gameBoard, "buttons");
-        assertEquals(6, buttons.length);
-        assertEquals(6, buttons[0].length);
-    }
-    
-    @Test
-    public void testChooseBoardSizeInvalid() {
-        GameFrame.GameBoard originalGameBoard = (GameFrame.GameBoard) getFieldValue(frame, "gameBoard");
-        
-        frame.boardSizeField.setText("2");
-        
-        frame.startNewGame();
-        GameFrame.GameBoard currentGameBoard = (GameFrame.GameBoard) getFieldValue(frame, "gameBoard");
-        assertNotEquals(3, getFieldValue(frame, "boardSize"));
-        frame.boardSizeField.setText("abc");
-        frame.startNewGame();
-        currentGameBoard = (GameFrame.GameBoard) getFieldValue(frame, "gameBoard");
-        assertNotEquals("abc", getFieldValue(frame, "boardSize").toString());
-    }
-    
-    @Test
-    public void testChooseSimpleGameMode() {
-        JRadioButton generalGameRadio = (JRadioButton) getFieldValue(frame, "generalGameRadioButton");
-        generalGameRadio.setSelected(true);
-        frame.startNewGame();
-        
-        assertFalse((Boolean) getFieldValue(frame, "isSimpleGame"));
-        
-        JRadioButton simpleGameRadio = (JRadioButton) getFieldValue(frame, "simpleGameRadioButton");
-        simpleGameRadio.setSelected(true);
-        frame.startNewGame();
-        
-        assertTrue((Boolean) getFieldValue(frame, "isSimpleGame"));
-    }
-    
-    @Test
-    public void testChooseGeneralGameMode() {
-        assertTrue((Boolean) getFieldValue(frame, "isSimpleGame"));
-        
-        JRadioButton generalGameRadio = (JRadioButton) getFieldValue(frame, "generalGameRadioButton");
-        generalGameRadio.setSelected(true);
-        frame.startNewGame();
-        
-        assertFalse((Boolean) getFieldValue(frame, "isSimpleGame"));
-        
-        JRadioButton simpleGameRadio = (JRadioButton) getFieldValue(frame, "simpleGameRadioButton");
-        assertFalse(simpleGameRadio.isSelected());
-        assertTrue(generalGameRadio.isSelected());
-    }
-    
-    @Test
-    public void testStartNewGameWithDifferentSize() {
-        GameFrame.GameBoard initialGameBoard = (GameFrame.GameBoard) getFieldValue(frame, "gameBoard");
-        
-        frame.boardSizeField.setText("10");
-        frame.startNewGame();
-        
-        GameFrame.GameBoard newGameBoard = (GameFrame.GameBoard) getFieldValue(frame, "gameBoard");
-        assertEquals(10, getFieldValue(frame, "boardSize"));
-        assertNotSame(initialGameBoard, newGameBoard);
-        JButton[][] buttons = (JButton[][]) getFieldValue(newGameBoard, "buttons");
-        assertEquals(10, buttons.length);
-        assertEquals(10, buttons[0].length);
-        
-        for (int i = 0; i < 10; i++) {
-            for (int j = 0; j < 10; j++) {
-                assertEquals("", buttons[i][j].getText());
-            }
-        }
-        
-        JLabel statusLabel = (JLabel) getFieldValue(frame, "statusLabel");
-        assertEquals("Current turn: blue", statusLabel.getText());
-    }
-    
-    @Test
-    public void testStartNewGameWithDifferentMode() {
-        assertTrue((Boolean) getFieldValue(frame, "isSimpleGame"));
-        
-        GameFrame.GameBoard gameBoard = (GameFrame.GameBoard) getFieldValue(frame, "gameBoard");
-        TestableGameFrame testFrame = (TestableGameFrame) frame;
-        
-        testFrame.getBlueS().setSelected(true);
-        gameBoard.makeMove(0, 0);
-        
-        testFrame.getRedO().setSelected(true);
-        gameBoard.makeMove(0, 1);
-        
-        JRadioButton generalGameRadio = (JRadioButton) getFieldValue(frame, "generalGameRadioButton");
-        generalGameRadio.setSelected(true);
-        frame.startNewGame();
-        
-        assertFalse((Boolean) getFieldValue(frame, "isSimpleGame"));
-        
-        GameFrame.GameBoard newGameBoard = (GameFrame.GameBoard) getFieldValue(frame, "gameBoard");
-        JButton[][] buttons = (JButton[][]) getFieldValue(newGameBoard, "buttons");
-        
-        for (int i = 0; i < buttons.length; i++) {
-            for (int j = 0; j < buttons[i].length; j++) {
-                assertEquals("", buttons[i][j].getText());
-            }
-        }
-        
-        assertEquals(0, getFieldValue(newGameBoard, "blueScore"));
-        assertEquals(0, getFieldValue(newGameBoard, "redScore"));
-    }
-    
-    @Test
-    public void testSimpleGameEndOnSOS() {
-        JRadioButton simpleGameRadio = (JRadioButton) getFieldValue(frame, "simpleGameRadioButton");
-        simpleGameRadio.setSelected(true);
-        frame.startNewGame();
-        
-        GameFrame.GameBoard gameBoard = (GameFrame.GameBoard) getFieldValue(frame, "gameBoard");
-        JButton[][] buttons = (JButton[][]) getFieldValue(gameBoard, "buttons");
-        TestableGameFrame testFrame = (TestableGameFrame) frame;
-        
-        testFrame.getBlueS().setSelected(true);
-        gameBoard.makeMove(1, 0); 
-        assertEquals("S", buttons[1][0].getText());
-        assertEquals(Color.BLUE, buttons[1][0].getForeground());
-    
-        testFrame.getRedO().setSelected(true);
-        gameBoard.makeMove(1, 1); 
-        assertEquals("O", buttons[1][1].getText());
-        assertEquals(Color.RED, buttons[1][1].getForeground());
-    
-        testFrame.getBlueS().setSelected(true);
-        gameBoard.makeMove(1, 2);
-        assertEquals("S", buttons[1][2].getText());
-        assertEquals(Color.BLUE, buttons[1][2].getForeground());
-    
-        assertTrue((Boolean) getFieldValue(gameBoard, "gameEnded"));
-    
-        JLabel statusLabel = (JLabel) getFieldValue(frame, "statusLabel");
-        assertTrue(statusLabel.getText().contains("Blue wins") || statusLabel.getText().contains("Game Over"));
-    }
-    
-    
-    @Test
-    public void testSimpleGameTurnSwitching() {
-        JRadioButton simpleGameRadio = (JRadioButton) getFieldValue(frame, "simpleGameRadioButton");
-        simpleGameRadio.setSelected(true);
-        frame.startNewGame();
-        
-        GameFrame.GameBoard gameBoard = (GameFrame.GameBoard) getFieldValue(frame, "gameBoard");
-        JButton[][] buttons = (JButton[][]) getFieldValue(gameBoard, "buttons");
-        TestableGameFrame testFrame = (TestableGameFrame) frame;
-        
-        assertTrue((Boolean) getFieldValue(gameBoard, "blueTurn"));
+    private SOSGameLogic gameLogic;
+    private SOSGameGUI gameGUI;
 
-        testFrame.getBlueS().setSelected(true);
-        gameBoard.makeMove(0, 0);
-        assertEquals("S", buttons[0][0].getText());
-        assertEquals(Color.BLUE, buttons[0][0].getForeground());
-        
-        assertFalse((Boolean) getFieldValue(gameBoard, "blueTurn"));
-        JLabel statusLabel = (JLabel) getFieldValue(frame, "statusLabel");
-        assertEquals("Current turn: red", statusLabel.getText());
-        
-        testFrame.getRedO().setSelected(true);
-        gameBoard.makeMove(0, 1);
-        assertEquals("O", buttons[0][1].getText());
-        assertEquals(Color.RED, buttons[0][1].getForeground());
-        
-        assertTrue((Boolean) getFieldValue(gameBoard, "blueTurn"));
-        statusLabel = (JLabel) getFieldValue(frame, "statusLabel");
-        assertEquals("Current turn: blue", statusLabel.getText());
+    @BeforeEach
+    public void setUp() {
+        gameLogic = new SOSGameLogic(3, true);
+        gameGUI = new SOSGameGUI(); 
     }
-    
+
     @Test
-    public void testGeneralGameContinuesAfterSOS() {
-        JRadioButton generalGameRadio = (JRadioButton) getFieldValue(frame, "generalGameRadioButton");
-        generalGameRadio.setSelected(true);
-        frame.startNewGame();
-        
-        GameFrame.GameBoard gameBoard = (GameFrame.GameBoard) getFieldValue(frame, "gameBoard");
-        JButton[][] buttons = (JButton[][]) getFieldValue(gameBoard, "buttons");
-        TestableGameFrame testFrame = (TestableGameFrame) frame;
-        
-        testFrame.getBlueS().setSelected(true);
-        gameBoard.makeMove(0, 0);
-        assertEquals("S", buttons[0][0].getText());
-        testFrame.getRedO().setSelected(true);
-        gameBoard.makeMove(0, 1);
-        assertEquals("O", buttons[0][1].getText());
-        testFrame.getBlueS().setSelected(true);
-        gameBoard.makeMove(0, 2);
-        assertEquals("S", buttons[0][2].getText());
-        
-        assertFalse((Boolean) getFieldValue(gameBoard, "gameEnded"));
-        assertEquals(1, getFieldValue(gameBoard, "blueScore"));
-        assertTrue((Boolean) getFieldValue(gameBoard, "blueTurn"));
-        
-        testFrame.getBlueO().setSelected(true);
-        gameBoard.makeMove(1, 0);
-        assertEquals("O", buttons[1][0].getText());
-        assertFalse((Boolean) getFieldValue(gameBoard, "blueTurn"));
-    }
-    
-    @Test
-    public void testGeneralGameScoreTracking() {
-        JRadioButton generalGameRadio = (JRadioButton) getFieldValue(frame, "generalGameRadioButton");
-        generalGameRadio.setSelected(true);
-        frame.startNewGame();
-        
-        GameFrame.GameBoard gameBoard = (GameFrame.GameBoard) getFieldValue(frame, "gameBoard");
-        JButton[][] buttons = (JButton[][]) getFieldValue(gameBoard, "buttons");
-        TestableGameFrame testFrame = (TestableGameFrame) frame;
-        
-        assertEquals(0, getFieldValue(gameBoard, "blueScore"));
-        assertEquals(0, getFieldValue(gameBoard, "redScore"));
-        testFrame.getBlueS().setSelected(true);
-        gameBoard.makeMove(0, 0);
-        testFrame.getBlueO().setSelected(true);
-        gameBoard.makeMove(0, 1);
-        testFrame.getBlueS().setSelected(true);
-        gameBoard.makeMove(0, 2);
-        assertEquals(0, getFieldValue(gameBoard, "blueScore"));
-        assertEquals(0, getFieldValue(gameBoard, "redScore"));
-        testFrame.getBlueS().setSelected(true);
-        gameBoard.makeMove(1, 0);
-        testFrame.getRedS().setSelected(true);
-        gameBoard.makeMove(1, 1);
-        testFrame.getRedO().setSelected(true);
-        gameBoard.makeMove(1, 2);
-        testFrame.getRedS().setSelected(true);
-        gameBoard.makeMove(1, 2);
-        
-        assertEquals(0, getFieldValue(gameBoard, "blueScore"));
-        assertEquals(0, getFieldValue(gameBoard, "redScore"));
-    }
-    
-    private Object getFieldValue(Object object, String fieldName) {
-        try {
-            Field field = findField(object.getClass(), fieldName);
-            field.setAccessible(true);
-            return field.get(object);
-        } catch (Exception e) {
-            throw new RuntimeException("Could not access field: " + fieldName, e);
+    public void testBoardSizeValidation_ValidSize() {
+        int[] validSizes = {3, 6, 9, 12};
+        for (int size : validSizes) {
+            SOSGameLogic validGame = new SOSGameLogic(size, true);
+            assertEquals(size, validGame.getSize(), "Board size accepted");
         }
     }
-    
-    private Field findField(Class<?> clazz, String fieldName) {
-        Field field = null;
-        try {
-            field = clazz.getDeclaredField(fieldName);
-        } catch (NoSuchFieldException e) {
-            if (clazz.getSuperclass() != null) {
-                field = findField(clazz.getSuperclass(), fieldName);
+
+    @Test
+    public void testBoardSizeValidation_InvalidSmallSize() {
+        assertThrows(IllegalArgumentException.class, () -> {
+            new SOSGameLogic(2, true);
+        }, "Board size less than 3 should throw an exception");
+    }
+
+    @Test
+    public void testBoardSizeValidation_InvalidLargeSize() {
+        assertThrows(IllegalArgumentException.class, () -> {
+            new SOSGameLogic(13, true);
+        }, "Board size greater than 12 should throw an exception");
+    }
+
+    @Test
+    public void testGameModeSelection_SimpleMode() {
+        SOSGameLogic simpleGame = new SOSGameLogic(3, true);
+        assertTrue(simpleGame.isSimpleGame(), "Game should be simple mode");
+    }
+
+    @Test
+    public void testGameModeSelection_GeneralMode() {
+        SOSGameLogic generalGame = new SOSGameLogic(3, false);
+        assertFalse(generalGame.isSimpleGame(), "Game should be general mode");
+    }
+
+    @Test
+    public void testMakeMove_OccupiedSpot() {
+        gameLogic.makeMove(0, 0, 'S');
+        assertFalse(gameLogic.makeMove(0, 0, 'O'), "Should not be able to move there");
+    }
+
+    @Test
+    public void testSOSFormation_SimpleMode() {
+        gameLogic.makeMove(0, 0, 'S');
+        gameLogic.makeMove(0, 1, 'O');
+        assertTrue(gameLogic.makeMove(0, 2, 'S'), "SOS formation should end the game in simple mode");
+        assertTrue(gameLogic.isGameEnded(), "Game should end after SOS formation in simple mode");
+    }
+
+    @Test
+    public void testSOSFormation_GeneralMode() {
+        SOSGameLogic generalGame = new SOSGameLogic(3, false);
+        generalGame.makeMove(0, 0, 'S');
+        generalGame.makeMove(0, 1, 'O');
+        assertTrue(generalGame.makeMove(0, 2, 'S'), "SOS formation should increase score in general mode");
+        assertFalse(generalGame.isGameEnded(), "Game should continue in general mode after SOS");
+    }
+
+    @Test
+    public void testGameEnd_FullBoard() {
+        SOSGameLogic fullBoardGame = new SOSGameLogic(3, false);
+        for (int i = 0; i < 3; i++) {
+            for (int j = 0; j < 3; j++) {
+                fullBoardGame.makeMove(i, j, i % 2 == 0 ? 'S' : 'O');
             }
         }
-        return field;
+        assertTrue(fullBoardGame.isGameEnded(), "Game should end when board is full");
     }
 }
+
+
+/* Manual Test Guide
+
+1. Board Size Selection
+
+Verify board size input field accepts valid sizes (3-12)
+1. Open game
+2. Enter board sizes 3, 6, 9, 12
+3. Click "New Game"
+4. Verify board is created correctly
+
+Verify error handling for invalid board sizes
+1. Enter board sizes 2, 13, 0, -1
+2. Verify error message is displayed
+3. Confirm game does not start
+
+2. Game Mode Selection
+
+Verify Simple Game Mode
+1. Game set to Simple
+2. Start new game
+3. Form an SOS
+4. Verify game immediately ends
+
+Verify General Game Mode
+1. Select "General game" radio button
+2. Start new game
+3. Form multiple SOSes
+4. Verify game continues until board is full
+5. Verify final score determines winner
+
+3. Move Checking
+
+Move Validation
+Verify player can only place letter on empty spots
+1. Try to place letter on an already occupied spot
+2. Verify move is not allowed
+
+Scoring and Game End
+Verify score tracking in General Mode
+1. Form multiple SOSes
+2. Verify correct player score is displayed
+
+4. Game End Checking
+
+Verify game end conditions
+1. Fill entire board
+2. Verify game ends
+3. Verify winner is correctly determined or draw is declared
+*/
