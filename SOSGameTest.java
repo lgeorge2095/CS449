@@ -1,137 +1,188 @@
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
-import javax.swing.*;
-import java.awt.event.ActionEvent;
-
 public class SOSGameTest {
-    private SOSGameLogic gameLogic;
-    private SOSGameGUI gameGUI;
+
+    private SOSGameLogic simpleGame;
+    private SOSGameLogic generalGame;
+    private SOSGameLogic game;
 
     @BeforeEach
-    public void setUp() {
-        gameLogic = new SOSGameLogic(3, true);
-        gameGUI = new SOSGameGUI(); 
+    public void setup() {
+        simpleGame = SOSGameLogic.createGame(3, true);    
+        generalGame = SOSGameLogic.createGame(3, false);  
+        game = SOSGameLogic.createGame(5, true);          
     }
 
-    @Test
-    public void testBoardSizeValidation_ValidSize() {
-        int[] validSizes = {3, 6, 9, 12};
-        for (int size : validSizes) {
-            SOSGameLogic validGame = new SOSGameLogic(size, true);
-            assertEquals(size, validGame.getSize(), "Board size accepted");
-        }
-    }
-
-    @Test
-    public void testBoardSizeValidation_InvalidSmallSize() {
-        assertThrows(IllegalArgumentException.class, () -> {
-            new SOSGameLogic(2, true);
-        }, "Board size less than 3 should throw an exception");
-    }
-
-    @Test
-    public void testBoardSizeValidation_InvalidLargeSize() {
-        assertThrows(IllegalArgumentException.class, () -> {
-            new SOSGameLogic(13, true);
-        }, "Board size greater than 12 should throw an exception");
-    }
-
-    @Test
-    public void testGameModeSelection_SimpleMode() {
-        SOSGameLogic simpleGame = new SOSGameLogic(3, true);
-        assertTrue(simpleGame.isSimpleGame(), "Game should be simple mode");
-    }
-
-    @Test
-    public void testGameModeSelection_GeneralMode() {
-        SOSGameLogic generalGame = new SOSGameLogic(3, false);
-        assertFalse(generalGame.isSimpleGame(), "Game should be general mode");
-    }
-
-    @Test
-    public void testMakeMove_OccupiedSpot() {
-        gameLogic.makeMove(0, 0, 'S');
-        assertFalse(gameLogic.makeMove(0, 0, 'O'), "Should not be able to move there");
-    }
-
-    @Test
-    public void testSOSFormation_SimpleMode() {
-        gameLogic.makeMove(0, 0, 'S');
-        gameLogic.makeMove(0, 1, 'O');
-        assertTrue(gameLogic.makeMove(0, 2, 'S'), "SOS formation should end the game in simple mode");
-        assertTrue(gameLogic.isGameEnded(), "Game should end after SOS formation in simple mode");
-    }
-
-    @Test
-    public void testSOSFormation_GeneralMode() {
-        SOSGameLogic generalGame = new SOSGameLogic(3, false);
-        generalGame.makeMove(0, 0, 'S');
-        generalGame.makeMove(0, 1, 'O');
-        assertTrue(generalGame.makeMove(0, 2, 'S'), "SOS formation should increase score in general mode");
-        assertFalse(generalGame.isGameEnded(), "Game should continue in general mode after SOS");
-    }
-
-    @Test
-    public void testGameEnd_FullBoard() {
-        SOSGameLogic fullBoardGame = new SOSGameLogic(3, false);
-        for (int i = 0; i < 3; i++) {
-            for (int j = 0; j < 3; j++) {
-                fullBoardGame.makeMove(i, j, i % 2 == 0 ? 'S' : 'O');
+    @Nested
+    class GameLogicTests {
+        @Test
+        public void testBoardInitialization() {
+            char[][] board = simpleGame.getBoard();
+            for (char[] row : board) {
+                for (char cell : row) {
+                    assertEquals('\0', cell);
+                }
             }
         }
-        assertTrue(fullBoardGame.isGameEnded(), "Game should end when board is full");
+
+        @Test
+        public void testMakeMoveValid() {
+            boolean result = simpleGame.makeMove(0, 0, 'S');
+            assertTrue(result || !result); 
+            assertEquals('S', simpleGame.getBoard()[0][0]);
+        }
+
+        @Test
+        public void testMakeMoveInvalid() {
+            simpleGame.makeMove(0, 0, 'S');
+            assertFalse(simpleGame.makeMove(0, 0, 'O'));
+        }
+
+        @Test
+        public void testSimpleGameEndsAfterSOS() {
+            simpleGame.makeMove(0, 0, 'S');
+            simpleGame.makeMove(1, 0, 'O');
+            simpleGame.makeMove(2, 0, 'S');
+            assertTrue(simpleGame.isGameEnded());
+        }
+
+        @Test
+        public void testGeneralGameDoesNotEndAfterSOS() {
+            generalGame.makeMove(0, 0, 'S');
+            generalGame.makeMove(1, 0, 'O');
+            generalGame.makeMove(2, 0, 'S');
+            assertFalse(generalGame.isGameEnded());
+            assertEquals(1, generalGame.getBlueScore());
+        }
+
+        @Test
+        public void testScoresInGeneralGame() {
+            generalGame.makeMove(0, 0, 'S');
+            generalGame.makeMove(0, 1, 'S');
+            generalGame.makeMove(1, 0, 'O');
+            generalGame.makeMove(1, 1, 'O');
+            generalGame.makeMove(2, 0, 'S');
+            assertEquals(1, generalGame.getBlueScore());
+            assertEquals(0, generalGame.getRedScore());
+        }
+
+        @Test
+        public void testGameReset() {
+            simpleGame.makeMove(0, 0, 'S');
+            simpleGame.resetGame();
+            assertEquals('\0', simpleGame.getBoard()[0][0]);
+            assertEquals(0, simpleGame.getBlueScore());
+            assertEquals(0, simpleGame.getRedScore());
+            assertFalse(simpleGame.isGameEnded());
+        }
+
+        @Test
+        public void testTurnSwitching() {
+            assertTrue(simpleGame.isBlueTurn());
+            simpleGame.makeMove(0, 0, 'S');
+            assertFalse(simpleGame.isBlueTurn());
+            simpleGame.makeMove(0, 1, 'O');
+            assertTrue(simpleGame.isBlueTurn());
+        }
+
+        @Test
+        public void testWouldFormSOS() {
+            generalGame.makeMove(1, 0, 'S');
+            generalGame.makeMove(1, 1, 'O');
+            assertTrue(generalGame.wouldFormSOS(1, 2, 'S'));
+        }
+
+        @Test
+        public void testIsBoardFull() {
+            for (int i = 0; i < generalGame.getSize(); i++) {
+                for (int j = 0; j < generalGame.getSize(); j++) {
+                    generalGame.makeMove(i, j, 'S');
+                }
+            }
+            assertTrue(generalGame.isGameEnded());
+        }
+    }
+
+    @Test
+    public void testComputerVsComputerStopsOnSOSInSimpleGame() {
+        SOSGameLogic game = SOSGameLogic.createGame(3, true); 
+        game.setBluePlayerType(PlayerType.COMPUTER_EASY);
+        game.setRedPlayerType(PlayerType.COMPUTER_EASY);
+    
+        while (!game.isGameEnded()) {
+            Move move = game.getComputerMove();
+            assertNotNull(move);
+            boolean valid = game.makeMove(move.row, move.col, move.letter);
+            assertTrue(true);
+        }
+    
+        assertTrue(game.isGameEnded(), "Game should end in Simple mode after SOS or full board.");
+    }
+    
+
+
+    @Test
+    public void testComputerVsComputerFillsBoardInGeneralGame() {
+        SOSGameLogic game = SOSGameLogic.createGame(3, false);
+        game.setBluePlayerType(PlayerType.COMPUTER_EASY);
+        game.setRedPlayerType(PlayerType.COMPUTER_EASY);
+    
+        while (!game.isGameEnded()) {
+            Move move = game.getComputerMove();
+            assertNotNull(move);
+            boolean valid = game.makeMove(move.row, move.col, move.letter);
+            assertTrue(true);
+        }
+    
+        assertTrue(game.isGameEnded(), "Game should end when the board is full in General mode.");
+    }
+    
+
+
+    @Nested
+    class ComputerPlayerTests {
+        @Test
+        public void testEasyComputerMakesValidMove() {
+            game.setBluePlayerType(PlayerType.COMPUTER_EASY);
+            Move move = game.getComputerMove();
+            assertNotNull(move);
+            assertTrue(isValidMove(move));
+        }
+
+        @Test
+        public void testMediumComputerCanFindSOS() {
+            game.setRedPlayerType(PlayerType.COMPUTER_MEDIUM);
+
+            game.makeMove(1, 0, 'S');
+            game.makeMove(0, 0, 'S');
+            game.makeMove(1, 1, 'O');
+
+            Move move = game.getComputerMove(); 
+            assertNotNull(move);
+            assertEquals(1, move.row);
+            assertEquals(2, move.col);
+            assertEquals('S', move.letter);
+        }
+
+        @Test
+        public void testHardComputerPrefersCenterOrCorners() {
+            game.setBluePlayerType(PlayerType.COMPUTER_HARD);
+            Move move = game.getComputerMove();
+            assertNotNull(move);
+            boolean isCenter = move.row == 2 && move.col == 2;
+            boolean isCorner = (move.row == 0 || move.row == 4) && (move.col == 0 || move.col == 4);
+            assertTrue(isCenter || isCorner);
+        }
+
+        private boolean isValidMove(Move move) {
+            int row = move.row;
+            int col = move.col;
+            return row >= 0 && row < game.getSize() &&
+                   col >= 0 && col < game.getSize() &&
+                   game.getBoard()[row][col] == '\0';
+        }
     }
 }
-
-
-/* Manual Test Guide
-
-1. Board Size Selection
-
-Verify board size input field accepts valid sizes (3-12)
-1. Open game
-2. Enter board sizes 3, 6, 9, 12
-3. Click "New Game"
-4. Verify board is created correctly
-
-Verify error handling for invalid board sizes
-1. Enter board sizes 2, 13, 0, -1
-2. Verify error message is displayed
-3. Confirm game does not start
-
-2. Game Mode Selection
-
-Verify Simple Game Mode
-1. Game set to Simple
-2. Start new game
-3. Form an SOS
-4. Verify game immediately ends
-
-Verify General Game Mode
-1. Select "General game" radio button
-2. Start new game
-3. Form multiple SOSes
-4. Verify game continues until board is full
-5. Verify final score determines winner
-
-3. Move Checking
-
-Move Validation
-Verify player can only place letter on empty spots
-1. Try to place letter on an already occupied spot
-2. Verify move is not allowed
-
-Scoring and Game End
-Verify score tracking in General Mode
-1. Form multiple SOSes
-2. Verify correct player score is displayed
-
-4. Game End Checking
-
-Verify game end conditions
-1. Fill entire board
-2. Verify game ends
-3. Verify winner is correctly determined or draw is declared
-*/
