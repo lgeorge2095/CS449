@@ -1,12 +1,86 @@
 import javax.swing.*;
 import java.awt.*;
 import java.util.List;
-import java.util.logging.Logger;
+import javax.swing.border.TitledBorder;
+
+interface GameController {
+    boolean makeMove(int row, int col, char letter);
+    void startNewGame(int size, boolean isSimple);
+    boolean isGameEnded();
+    boolean isBlueTurn();
+    List<int[]> getSOSCoordinates();
+    int getBlueScore();
+    int getRedScore();
+    void setBluePlayerType(PlayerType type);
+    void setRedPlayerType(PlayerType type);
+    boolean isCurrentPlayerComputer();
+    Move getComputerMove();
+}
 
 public class SOSGameGUI {
-    private static final Logger LOGGER = Logger.getLogger(SOSGameGUI.class.getName());
+    private class SOSGameController implements GameController {
+        private SOSGameLogic gameLogic;
+        
+        public SOSGameController(int initialSize, boolean isSimple) {
+            this.gameLogic = SOSGameLogic.createGame(initialSize, isSimple);
+        }
+        
+        @Override
+        public boolean makeMove(int row, int col, char letter) {
+            return gameLogic.makeMove(row, col, letter);
+        }
+        
+        @Override
+        public void startNewGame(int size, boolean isSimple) {
+            this.gameLogic = SOSGameLogic.createGame(size, isSimple);
+        }
+        
+        @Override
+        public boolean isGameEnded() {
+            return gameLogic.isGameEnded();
+        }
+        
+        @Override
+        public boolean isBlueTurn() {
+            return gameLogic.isBlueTurn();
+        }
+        
+        @Override
+        public List<int[]> getSOSCoordinates() {
+            return gameLogic.getLastSOSCoordinates();
+        }
+        
+        @Override
+        public int getBlueScore() {
+            return gameLogic.getBlueScore();
+        }
+        
+        @Override
+        public int getRedScore() {
+            return gameLogic.getRedScore();
+        }
+        
+        @Override
+        public void setBluePlayerType(PlayerType type) {
+            gameLogic.setBluePlayerType(type);
+        }
+        
+        @Override
+        public void setRedPlayerType(PlayerType type) {
+            gameLogic.setRedPlayerType(type);
+        }
+        
+        @Override
+        public boolean isCurrentPlayerComputer() {
+            return gameLogic.isCurrentPlayerComputer();
+        }
+        
+        @Override
+        public Move getComputerMove() {
+            return gameLogic.getComputerMove();
+        }
+    }
     
-    private SOSGameLogic gameLogic;
     private JFrame frame;
     private JButton[][] buttons;
     private JLabel statusLabel;
@@ -17,25 +91,36 @@ public class SOSGameGUI {
     private JRadioButton simpleGameRadioButton;
     private JRadioButton generalGameRadioButton;
     private JTextField boardSizeField;
+    private JComboBox<String> bluePlayerComboBox;
+    private JComboBox<String> redPlayerComboBox;
+    private GameController controller;
+    private Timer computerMoveTimer;
 
     public SOSGameGUI() {
-        SwingUtilities.invokeLater(this::initializeGUI);
-    }
-
-    private void initializeGUI() {
-        try {
-            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
-        } catch (Exception e) {
-            LOGGER.warning("Could not set system look and feel: " + e.getMessage());
-        }
+        controller = new SOSGameController(3, true);
         
-        createAndShowGUI();
+        computerMoveTimer = new Timer(500, e -> {
+            if (!controller.isGameEnded() && controller.isCurrentPlayerComputer()) {
+                makeComputerMove();
+            } else {
+                computerMoveTimer.stop();
+            }
+        });
+        
+        SwingUtilities.invokeLater(() -> {
+            try {
+                UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            createAndShowGUI();
+        });
     }
 
     private void createAndShowGUI() {
-        frame = new JFrame(SOSGameConfig.GAME_TITLE);
+        frame = new JFrame("SOS Game");
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        frame.setSize(700, 600);
+        frame.setSize(800, 600);
         frame.setLocationRelativeTo(null);
         
         createLayout();
@@ -50,9 +135,7 @@ public class SOSGameGUI {
         JPanel topPanel = createTopPanel();
         contentPane.add(topPanel, BorderLayout.NORTH);
         
-        int boardSize = SOSGameConfig.DEFAULT_BOARD_SIZE;
-        boolean isSimpleGame = true;
-        gameLogic = new SOSGameLogic(boardSize, isSimpleGame);
+        int boardSize = 3;
         JPanel gameBoardPanel = createGameBoardPanel(boardSize);
         contentPane.add(gameBoardPanel, BorderLayout.CENTER);
         
@@ -65,6 +148,8 @@ public class SOSGameGUI {
         statusLabel = new JLabel("Current turn: blue", SwingConstants.CENTER);
         statusLabel.setFont(new Font("SansSerif", Font.BOLD, 14));
         contentPane.add(statusLabel, BorderLayout.SOUTH);
+        
+        checkAndStartComputerTurn();
     }
     
     private JPanel createTopPanel() {
@@ -72,42 +157,29 @@ public class SOSGameGUI {
         topPanel.setLayout(new FlowLayout(FlowLayout.LEFT, 20, 5));
         topPanel.setBackground(Color.WHITE);
         
-        setupTitleLabel(topPanel);
-        setupGameModePanel(topPanel);
-        setupBoardSizeInput(topPanel);
-        setupNewGameButton(topPanel);
-        
-        return topPanel;
-    }
-
-    private void setupTitleLabel(JPanel topPanel) {
-        JLabel titleLabel = new JLabel(SOSGameConfig.GAME_TITLE);
+        JLabel titleLabel = new JLabel("SOS Game");
         titleLabel.setFont(new Font("Arial", Font.BOLD, 20));
         topPanel.add(titleLabel);
-    }
-
-    private void setupGameModePanel(JPanel topPanel) {
-        ButtonGroup gameModeGroup = new ButtonGroup();
+        
         simpleGameRadioButton = new JRadioButton("Simple game", true);
         generalGameRadioButton = new JRadioButton("General game");
         
+        ButtonGroup gameModeGroup = new ButtonGroup();
         gameModeGroup.add(simpleGameRadioButton);
         gameModeGroup.add(generalGameRadioButton);
         
         topPanel.add(simpleGameRadioButton);
         topPanel.add(generalGameRadioButton);
-    }
-
-    private void setupBoardSizeInput(JPanel topPanel) {
+        
         topPanel.add(new JLabel("Board size"));
-        boardSizeField = new JTextField(String.valueOf(SOSGameConfig.DEFAULT_BOARD_SIZE), 2);
+        boardSizeField = new JTextField("3", 2);
         topPanel.add(boardSizeField);
-    }
-
-    private void setupNewGameButton(JPanel topPanel) {
+        
         JButton newGameButton = new JButton("New Game");
         newGameButton.addActionListener(e -> startNewGame());
         topPanel.add(newGameButton);
+        
+        return topPanel;
     }
     
     private JPanel createGameBoardPanel(int size) {
@@ -122,171 +194,256 @@ public class SOSGameGUI {
                 final int row = i;
                 final int col = j;
                 
-                buttons[i][j] = createGameButton(row, col);
+                buttons[i][j] = new JButton("");
+                buttons[i][j].setFont(new Font("SansSerif", Font.BOLD, 18));
+                buttons[i][j].setFocusPainted(false);
+                buttons[i][j].setBorder(BorderFactory.createLineBorder(Color.GRAY));
+                buttons[i][j].setBackground(Color.WHITE);
+                
+                buttons[i][j].addActionListener(e -> {
+                    if (!controller.isGameEnded() && !controller.isCurrentPlayerComputer()) {
+                        makeMove(row, col);
+                    }
+                });
+                
                 gameBoard.add(buttons[i][j]);
             }
         }
         
         return gameBoard;
     }
-
-    private JButton createGameButton(int row, int col) {
-        JButton button = new JButton("");
-        button.setFont(new Font("SansSerif", Font.BOLD, 18));
-        button.setFocusPainted(false);
-        button.setBorder(BorderFactory.createLineBorder(Color.GRAY));
-        button.setBackground(Color.WHITE);
-        
-        button.addActionListener(e -> {
-            if (!gameLogic.isGameEnded()) {
-                makeMove(row, col);
-            }
-        });
-        
-        return button;
-    }
     
     private JPanel createPlayerPanel(String title, boolean isBlue) {
         JPanel panel = new JPanel();
         panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
         panel.setBackground(Color.WHITE);
-        panel.setBorder(BorderFactory.createEmptyBorder(10, 20, 10, 20));
+        panel.setBorder(BorderFactory.createTitledBorder(
+            BorderFactory.createEtchedBorder(), 
+            title, 
+            TitledBorder.CENTER, 
+            TitledBorder.TOP,
+            new Font("SansSerif", Font.BOLD, 14),
+            isBlue ? Color.BLUE : Color.RED
+        ));
         
-        JLabel titleLabel = new JLabel(title);
-        titleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
-        titleLabel.setFont(new Font("SansSerif", Font.BOLD, 14));
-        panel.add(titleLabel);
+        JPanel playerTypePanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        playerTypePanel.setBackground(Color.WHITE);
+        playerTypePanel.add(new JLabel("Player type:"));
+        
+        String[] playerTypes = {"Human", "Computer (Easy)", "Computer (Medium)", "Computer (Hard)"};
+        JComboBox<String> playerTypeCombo = new JComboBox<>(playerTypes);
+        playerTypeCombo.setPreferredSize(new Dimension(150, 25));
+        playerTypePanel.add(playerTypeCombo);
+        
+        if (isBlue) {
+            bluePlayerComboBox = playerTypeCombo;
+            playerTypeCombo.addActionListener(e -> {
+                PlayerType type = getPlayerTypeFromSelection(playerTypeCombo.getSelectedIndex());
+                controller.setBluePlayerType(type);
+                checkAndStartComputerTurn();
+            });
+        } else {
+            redPlayerComboBox = playerTypeCombo;
+            playerTypeCombo.addActionListener(e -> {
+                PlayerType type = getPlayerTypeFromSelection(playerTypeCombo.getSelectedIndex());
+                controller.setRedPlayerType(type);
+                checkAndStartComputerTurn();
+            });
+        }
+        
+        panel.add(playerTypePanel);
         panel.add(Box.createVerticalStrut(20));
+        
+        JLabel letterLabel = new JLabel("Select letter:");
+        letterLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        panel.add(letterLabel);
         
         JRadioButton sButton = new JRadioButton("S", true);
         JRadioButton oButton = new JRadioButton("O");
         
-        Color playerColor = isBlue ? SOSGameConfig.BLUE_PLAYER_COLOR : SOSGameConfig.RED_PLAYER_COLOR;
-        sButton.setForeground(playerColor);
-        oButton.setForeground(playerColor);
-        
         if (isBlue) {
             blueS = sButton;
             blueO = oButton;
+            sButton.setForeground(Color.BLUE);
+            oButton.setForeground(Color.BLUE);
         } else {
             redS = sButton;
             redO = oButton;
+            sButton.setForeground(Color.RED);
+            oButton.setForeground(Color.RED);
         }
         
         ButtonGroup letterGroup = new ButtonGroup();
         letterGroup.add(sButton);
         letterGroup.add(oButton);
         
-        panel.add(createLetterPanel(sButton));
-        panel.add(createLetterPanel(oButton));
+        JPanel sPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        sPanel.setBackground(Color.WHITE);
+        sPanel.add(sButton);
+        
+        JPanel oPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        oPanel.setBackground(Color.WHITE);
+        oPanel.add(oButton);
+        
+        panel.add(sPanel);
+        panel.add(oPanel);
+        
+        JLabel scoreLabel = new JLabel("Score: 0");
+        scoreLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        scoreLabel.setFont(new Font("SansSerif", Font.BOLD, 14));
+        scoreLabel.setForeground(isBlue ? Color.BLUE : Color.RED);
+        
+        if (isBlue) {
+            scoreLabel.setName("blueScore");
+        } else {
+            scoreLabel.setName("redScore");
+        }
+        
+        panel.add(Box.createVerticalStrut(20));
+        panel.add(scoreLabel);
         
         return panel;
     }
-
-    private JPanel createLetterPanel(JRadioButton button) {
-        JPanel letterPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        letterPanel.setBackground(Color.WHITE);
-        letterPanel.add(button);
-        return letterPanel;
+    
+    private PlayerType getPlayerTypeFromSelection(int selectedIndex) {
+        switch (selectedIndex) {
+            case 0: return PlayerType.HUMAN;
+            case 1: return PlayerType.COMPUTER_EASY;
+            case 2: return PlayerType.COMPUTER_MEDIUM;
+            case 3: return PlayerType.COMPUTER_HARD;
+            default: return PlayerType.HUMAN;
+        }
     }
     
     private void makeMove(int row, int col) {
-        char letter = getSelectedLetter(gameLogic.isBlueTurn());
+        boolean isBlue = controller.isBlueTurn(); 
+        char letter = getSelectedLetter(isBlue);
         
-        buttons[row][col].setText(String.valueOf(letter));
-        buttons[row][col].setForeground(gameLogic.isBlueTurn() ? 
-            SOSGameConfig.BLUE_PLAYER_COLOR : SOSGameConfig.RED_PLAYER_COLOR);
+        boolean formedSOS = controller.makeMove(row, col, letter);
+        updateUI(row, col, letter, formedSOS, isBlue); 
         
-        boolean formedSOS = gameLogic.makeMove(row, col, letter);
-        
-        resetSOSHighlights();
-        highlightSOSCoordinates();
-        
-        updateStatus();
+        checkAndStartComputerTurn();
     }
     
-    private void resetSOSHighlights() {
-        for (int i = 0; i < gameLogic.getSize(); i++) {
-            for (int j = 0; j < gameLogic.getSize(); j++) {
+    private void makeComputerMove() {
+        Move move = controller.getComputerMove();
+        if (move != null) {
+            boolean isBlue = controller.isBlueTurn(); 
+            boolean formedSOS = controller.makeMove(move.row, move.col, move.letter);
+            updateUI(move.row, move.col, move.letter, formedSOS, isBlue);
+            
+            checkAndStartComputerTurn();
+        }
+    }
+    
+    private void updateUI(int row, int col, char letter, boolean formedSOS, boolean isBlue) {
+        buttons[row][col].setText(String.valueOf(letter));
+        buttons[row][col].setForeground(isBlue ? Color.BLUE : Color.RED);
+        
+        for (int i = 0; i < buttons.length; i++) {
+            for (int j = 0; j < buttons[i].length; j++) {
                 buttons[i][j].setBackground(Color.WHITE);
             }
         }
-    }
-
-    private void highlightSOSCoordinates() {
-        List<int[]> sosCoordinates = gameLogic.getLastSOSCoordinates();
-        Color highlightColor = gameLogic.isBlueTurn() ? 
-            SOSGameConfig.BLUE_SOS_HIGHLIGHT : SOSGameConfig.RED_SOS_HIGHLIGHT;
         
+        List<int[]> sosCoordinates = controller.getSOSCoordinates();
+        Color highlightColor = isBlue ? new Color(200, 230, 255) : new Color(255, 220, 220);
         for (int[] coord : sosCoordinates) {
             buttons[coord[0]][coord[1]].setBackground(highlightColor);
         }
+        
+        updateStatus();
+        updateScores();
     }
     
     private void updateStatus() {
-        SOSGameState gameState = gameLogic.getGameState();
-        
-        if (gameState.isGameEnded()) {
-            statusLabel.setText("Game Over - " + gameState.getGameResult());
+        if (controller.isGameEnded()) {
+            int blueScore = controller.getBlueScore();
+            int redScore = controller.getRedScore();
+            
+            if (blueScore == redScore) {
+                statusLabel.setText("Game Over - Draw!");
+            } else {
+                String winner = blueScore > redScore ? "Blue" : "Red";
+                statusLabel.setText("Game Over - " + winner + " wins!");
+            }
+            
+            computerMoveTimer.stop();
         } else {
-            statusLabel.setText("Current turn: " + (gameState.isBlueTurn() ? "blue" : "red"));
+            statusLabel.setText("Current turn: " + (controller.isBlueTurn() ? "blue" : "red"));
+        }
+    }
+    
+    private void updateScores() {
+        for (Component comp : frame.getContentPane().getComponents()) {
+            if (comp instanceof JPanel) {
+                JPanel panel = (JPanel) comp;
+                for (Component c : panel.getComponents()) {
+                    if (c instanceof JLabel && "blueScore".equals(c.getName())) {
+                        ((JLabel) c).setText("Score: " + controller.getBlueScore());
+                    } else if (c instanceof JLabel && "redScore".equals(c.getName())) {
+                        ((JLabel) c).setText("Score: " + controller.getRedScore());
+                    }
+                }
+            }
+        }
+    }
+    
+    private void checkAndStartComputerTurn() {
+        computerMoveTimer.stop();
+        
+        if (!controller.isGameEnded() && controller.isCurrentPlayerComputer()) {
+            SwingUtilities.invokeLater(() -> {
+                computerMoveTimer.start();
+            });
         }
     }
     
     private void startNewGame() {
         try {
-            int boardSize = validateAndParseBoardSize();
-            boolean isSimpleGame = simpleGameRadioButton.isSelected();
+            int boardSize = Integer.parseInt(boardSizeField.getText().trim());
+            if (boardSize < 3 || boardSize > 12) {
+                JOptionPane.showMessageDialog(frame, "Board size must be between 3 and 12", 
+                                             "Invalid Input", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
             
-            recreateGameBoard(boardSize, isSimpleGame);
-        } catch (IllegalArgumentException e) {
-            JOptionPane.showMessageDialog(frame, e.getMessage(), 
+            boolean isSimpleGame = simpleGameRadioButton.isSelected();
+            controller.startNewGame(boardSize, isSimpleGame);
+            controller.setBluePlayerType(
+                getPlayerTypeFromSelection(bluePlayerComboBox.getSelectedIndex())
+            );
+            
+            controller.setRedPlayerType(
+                getPlayerTypeFromSelection(redPlayerComboBox.getSelectedIndex())
+            );
+            
+            Container contentPane = frame.getContentPane();
+            Component oldGameBoard = null;
+            for (Component comp : contentPane.getComponents()) {
+                if (comp instanceof JPanel && "gameBoard".equals(comp.getName())) {
+                    oldGameBoard = comp;
+                    break;
+                }
+            }
+            
+            if (oldGameBoard != null) {
+                contentPane.remove(oldGameBoard);
+            }
+            
+            JPanel gameBoardPanel = createGameBoardPanel(boardSize);
+            contentPane.add(gameBoardPanel, BorderLayout.CENTER);
+            statusLabel.setText("Current turn: blue");
+            updateScores();
+            frame.revalidate();
+            frame.repaint();
+            computerMoveTimer.stop();
+            
+            checkAndStartComputerTurn();
+        } catch (NumberFormatException e) {
+            JOptionPane.showMessageDialog(frame, "Please enter a valid number for board size", 
                                          "Invalid Input", JOptionPane.ERROR_MESSAGE);
         }
-    }
-    
-    private int validateAndParseBoardSize() {
-        String sizeInput = boardSizeField.getText().trim();
-        try {
-            int boardSize = Integer.parseInt(sizeInput);
-            if (boardSize < SOSGameConfig.MIN_BOARD_SIZE || 
-                boardSize > SOSGameConfig.MAX_BOARD_SIZE) {
-                throw new IllegalArgumentException(
-                    "Board size must be between " + SOSGameConfig.MIN_BOARD_SIZE + 
-                    " and " + SOSGameConfig.MAX_BOARD_SIZE
-                );
-            }
-            return boardSize;
-        } catch (NumberFormatException e) {
-            throw new IllegalArgumentException("Please enter a valid number for board size");
-        }
-    }
-
-    private void recreateGameBoard(int boardSize, boolean isSimpleGame) {
-        Container contentPane = frame.getContentPane();
-        Component oldGameBoard = findGameBoard(contentPane);
-        
-        if (oldGameBoard != null) {
-            contentPane.remove(oldGameBoard);
-        }
-        
-        gameLogic = new SOSGameLogic(boardSize, isSimpleGame);
-        JPanel gameBoardPanel = createGameBoardPanel(boardSize);
-        contentPane.add(gameBoardPanel, BorderLayout.CENTER);
-        
-        statusLabel.setText("Current turn: blue");
-        
-        frame.revalidate();
-        frame.repaint();
-    }
-
-    private Component findGameBoard(Container contentPane) {
-        for (Component comp : contentPane.getComponents()) {
-            if (comp instanceof JPanel && "gameBoard".equals(comp.getName())) {
-                return comp;
-            }
-        }
-        return null;
     }
     
     private char getSelectedLetter(boolean blueTurn) {
