@@ -1,6 +1,7 @@
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+import java.io.IOException;
 
 interface Game {
     boolean makeMove(int row, int col, char letter);
@@ -221,6 +222,7 @@ public abstract class SOSGameLogic implements Game {
     protected boolean isSimple;
     protected Player bluePlayer = PlayerFactory.createPlayer(PlayerType.HUMAN);
     protected Player redPlayer = PlayerFactory.createPlayer(PlayerType.HUMAN);
+    private MoveRecorder moveRecorder = new MoveRecorder();
     
     public SOSGameLogic(int size, boolean isSimple) {
         this.size = size;
@@ -252,29 +254,33 @@ public abstract class SOSGameLogic implements Game {
         if (gameEnded || board[row][col] != '\0') {
             return false;
         }
-    
+
         board[row][col] = letter;
-        
+
         boolean formedSOS = checkForSOS(row, col, letter);
-        
+
+        String color = blueTurn ? "Blue" : "Red";
+        boolean isAI = blueTurn ? bluePlayer.isComputer() : redPlayer.isComputer();
+        moveRecorder.recordMove(row, col, color, letter, isAI);
+
         if (formedSOS) {
             if (blueTurn) {
                 blueScore++;
             } else {
                 redScore++;
             }
-            
+
             if (isSimple) {
                 gameEnded = true;
             }
         } else {
             blueTurn = !blueTurn;
         }
-        
+
         if (isBoardFull()) {
             gameEnded = true;
         }
-        
+
         return formedSOS;
     }
     
@@ -443,6 +449,15 @@ public abstract class SOSGameLogic implements Game {
     
     public boolean isCurrentPlayerComputer() {
         return blueTurn ? bluePlayer.isComputer() : redPlayer.isComputer();
+    }
+
+    public List<String> replayMoves(String filePath) throws IOException {
+        resetGame();
+        return moveRecorder.loadFromFile(filePath);
+    }
+
+    public void saveMoves(String filePath) throws IOException {
+        moveRecorder.saveToFile(filePath);
     }
 }
 
