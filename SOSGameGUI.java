@@ -2,6 +2,7 @@ import javax.swing.*;
 import java.awt.*;
 import java.util.List;
 import javax.swing.border.TitledBorder;
+import java.io.IOException;
 
 interface GameController {
     boolean makeMove(int row, int col, char letter);
@@ -15,6 +16,9 @@ interface GameController {
     void setRedPlayerType(PlayerType type);
     boolean isCurrentPlayerComputer();
     Move getComputerMove();
+    void saveMoves(String filePath) throws IOException;
+    List<String> replayMoves(String filePath) throws IOException;
+    char[][] getBoard();
 }
 
 public class SOSGameGUI {
@@ -78,6 +82,21 @@ public class SOSGameGUI {
         @Override
         public Move getComputerMove() {
             return gameLogic.getComputerMove();
+        }
+
+        @Override
+        public void saveMoves(String filePath) throws IOException {
+            gameLogic.saveMoves(filePath);
+        }
+
+        @Override
+        public List<String> replayMoves(String filePath) throws IOException {
+            return gameLogic.replayMoves(filePath);
+        }
+
+        @Override
+        public char[][] getBoard() {
+            return gameLogic.getBoard();
         }
     }
     
@@ -156,29 +175,37 @@ public class SOSGameGUI {
         JPanel topPanel = new JPanel();
         topPanel.setLayout(new FlowLayout(FlowLayout.LEFT, 20, 5));
         topPanel.setBackground(Color.WHITE);
-        
+
         JLabel titleLabel = new JLabel("SOS Game");
         titleLabel.setFont(new Font("Arial", Font.BOLD, 20));
         topPanel.add(titleLabel);
-        
+
         simpleGameRadioButton = new JRadioButton("Simple game", true);
         generalGameRadioButton = new JRadioButton("General game");
-        
+
         ButtonGroup gameModeGroup = new ButtonGroup();
         gameModeGroup.add(simpleGameRadioButton);
         gameModeGroup.add(generalGameRadioButton);
-        
+
         topPanel.add(simpleGameRadioButton);
         topPanel.add(generalGameRadioButton);
-        
+
         topPanel.add(new JLabel("Board size"));
         boardSizeField = new JTextField("3", 2);
         topPanel.add(boardSizeField);
-        
+
         JButton newGameButton = new JButton("New Game");
         newGameButton.addActionListener(e -> startNewGame());
         topPanel.add(newGameButton);
-        
+
+        JButton saveButton = new JButton("Save");
+        saveButton.addActionListener(e -> saveMoves());
+        topPanel.add(saveButton);
+
+        JButton replayButton = new JButton("Replay");
+        replayButton.addActionListener(e -> replayMoves());
+        topPanel.add(replayButton);
+
         return topPanel;
     }
     
@@ -451,6 +478,54 @@ public class SOSGameGUI {
             return blueS.isSelected() ? 'S' : 'O';
         } else {
             return redS.isSelected() ? 'S' : 'O';
+        }
+    }
+
+    private void saveMoves() {
+        try {
+            String filePath = "Replay.txt";
+            controller.saveMoves(filePath);
+            JOptionPane.showMessageDialog(frame, "Replay saved at " + filePath);
+        } catch (IOException e) {
+            JOptionPane.showMessageDialog(frame, "Failed to save moves: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void replayMoves() {
+        try {
+            String filePath = "Replay.txt";
+            List<String> moves = controller.replayMoves(filePath);
+
+            for (int i = 0; i < buttons.length; i++) {
+                for (int j = 0; j < buttons[i].length; j++) {
+                    buttons[i][j].setText("");
+                    buttons[i][j].setBackground(Color.WHITE); 
+                }
+            }
+
+            Timer replayTimer = new Timer(1000, null); 
+            final int[] moveIndex = {0};
+
+            replayTimer.addActionListener(e -> {
+                if (moveIndex[0] < moves.size()) {
+                    String move = moves.get(moveIndex[0]);
+                    String[] parts = move.split(",");
+                    int row = Integer.parseInt(parts[0]);
+                    int col = Integer.parseInt(parts[1]);
+                    String color = parts[2];
+                    char letter = parts[3].charAt(0); 
+                    buttons[row][col].setText(String.valueOf(letter));
+                    buttons[row][col].setForeground(color.equals("Blue") ? Color.BLUE : Color.RED);
+
+                    moveIndex[0]++;
+                } else {
+                    replayTimer.stop();
+                }
+            });
+
+            replayTimer.start();
+        } catch (IOException e) {
+            JOptionPane.showMessageDialog(frame, "Failed to replay moves: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
         }
     }
     
