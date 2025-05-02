@@ -1,0 +1,9 @@
+1,2,Blue,O,AI
+1,1,Red,O,AI
+0,1,Blue,O,AI
+0,0,Red,S,AI
+0,2,Blue,S,AI
+2,0,Blue,S,AI
+1,0,Blue,S,AI
+2,2,Red,S,AI
+2,1,Red,O,AI
