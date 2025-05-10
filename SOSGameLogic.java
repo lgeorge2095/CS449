@@ -90,9 +90,32 @@ abstract class ComputerPlayer implements Player {
 class EasyComputerPlayer extends ComputerPlayer {
     @Override
     public Move getNextMove(SOSGameLogic game) {
+        Move potentialMove = findPotentialSOS(game);
+        if (potentialMove != null) {
+            return potentialMove;
+        }
+
         return findRandomMove(game);
     }
-    
+
+    private Move findPotentialSOS(SOSGameLogic game) {
+        int size = game.getSize();
+        char[][] board = game.getBoard();
+        for (int i = 0; i < size; i++) {
+            for (int j = 0; j < size; j++) {
+                if (board[i][j] == '\0') {
+                    if (game.wouldFormSOS(i, j, 'S')) {
+                        return new Move(i, j, 'S');
+                    }
+                    if (game.wouldFormSOS(i, j, 'O')) {
+                        return new Move(i, j, 'O');
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
     @Override
     public PlayerType getType() {
         return PlayerType.COMPUTER_EASY;
@@ -102,15 +125,25 @@ class EasyComputerPlayer extends ComputerPlayer {
 class MediumComputerPlayer extends ComputerPlayer {
     @Override
     public Move getNextMove(SOSGameLogic game) {
-        if (random.nextDouble() < 0.4) {
-            Move potentialMove = findPotentialSOS(game);
-            if (potentialMove != null) {
-                return potentialMove;
-            }
+        Move potentialMove = findPotentialSOS(game);
+        if (potentialMove != null) {
+            return potentialMove;
         }
+
+        Move blockMove = findBlockingMove(game);
+        if (blockMove != null) {
+            return blockMove;
+        }
+
         return findRandomMove(game);
     }
-    
+
+    protected Move findBlockingMove(SOSGameLogic game) {
+        SOSGameLogic tempGame = game.createCopy();
+        tempGame.toggleTurn(); 
+        return findPotentialSOS(tempGame);
+    }
+
     protected Move findPotentialSOS(SOSGameLogic game) {
         int size = game.getSize();
         char[][] board = game.getBoard();
@@ -120,7 +153,6 @@ class MediumComputerPlayer extends ComputerPlayer {
                     if (game.wouldFormSOS(i, j, 'S')) {
                         return new Move(i, j, 'S');
                     }
-                    
                     if (game.wouldFormSOS(i, j, 'O')) {
                         return new Move(i, j, 'O');
                     }
@@ -129,7 +161,7 @@ class MediumComputerPlayer extends ComputerPlayer {
         }
         return null;
     }
-    
+
     @Override
     public PlayerType getType() {
         return PlayerType.COMPUTER_MEDIUM;
@@ -143,51 +175,81 @@ class HardComputerPlayer extends MediumComputerPlayer {
         if (sosMove != null) {
             return sosMove;
         }
-        
+
         Move blockMove = findBlockingMove(game);
         if (blockMove != null) {
             return blockMove;
         }
-        
-        Move strategicMove = findStrategicMove(game);
+
+        Move strategicMove = findBestStrategicMove(game);
         if (strategicMove != null) {
             return strategicMove;
         }
+
         return findRandomMove(game);
     }
-    
-    private Move findBlockingMove(SOSGameLogic game) {
-        SOSGameLogic tempGame = game.createCopy();
-        tempGame.toggleTurn(); // Switch to opponent's turn
-        return findPotentialSOS(tempGame);
-    }
-    
-    private Move findStrategicMove(SOSGameLogic game) {
+
+    private Move findBestStrategicMove(SOSGameLogic game) {
         int size = game.getSize();
         char[][] board = game.getBoard();
-        
-        int center = size / 2;
-        if (size % 2 == 1 && board[center][center] == '\0') {
-            return new Move(center, center, 'O');
-        }
-        
-        int[][] corners = {{0, 0}, {0, size-1}, {size-1, 0}, {size-1, size-1}};
-        for (int[] corner : corners) {
-            if (board[corner[0]][corner[1]] == '\0') {
-                return new Move(corner[0], corner[1], 'S');
+        Move bestMove = null;
+        int maxScore = Integer.MIN_VALUE;
+
+        for (int i = 0; i < size; i++) {
+            for (int j = 0; j < size; j++) {
+                if (board[i][j] == '\0') {
+                    for (char letter : new char[]{'S', 'O'}) {
+                        int score = evaluateMove(game, i, j, letter);
+                        if (score > maxScore) {
+                            maxScore = score;
+                            bestMove = new Move(i, j, letter);
+                        }
+                    }
+                }
             }
         }
-        
-        for (int i = 0; i < size; i++) {
-            if (board[0][i] == '\0') return new Move(0, i, 'S');
-            if (board[i][0] == '\0') return new Move(i, 0, 'S');
-            if (board[size-1][i] == '\0') return new Move(size-1, i, 'S');
-            if (board[i][size-1] == '\0') return new Move(i, size-1, 'S');
-        }
-        
-        return null;
+        return bestMove;
     }
-    
+
+    private int evaluateMove(SOSGameLogic game, int row, int col, char letter) {
+        SOSGameLogic tempGame = game.createCopy();
+        tempGame.makeMove(row, col, letter);
+
+        int score = 0;
+        if (tempGame.wouldFormSOS(row, col, letter)) {
+            score += 10; 
+        }
+
+        score += countPotentialSOSOpportunities(tempGame, row, col);
+
+        return score;
+    }
+
+    private int countPotentialSOSOpportunities(SOSGameLogic game, int row, int col) {
+        int opportunities = 0;
+        int[][] directions = {
+            {-1, -1}, {-1, 0}, {-1, 1},
+            {0, -1},           {0, 1},
+            {1, -1},  {1, 0},  {1, 1}
+        };
+
+        for (int[] dir : directions) {
+            int dr = dir[0];
+            int dc = dir[1];
+            int r1 = row + dr;
+            int c1 = col + dc;
+            int r2 = row - dr;
+            int c2 = col - dc;
+
+            if (game.isValidPosition(r1, c1) && game.isValidPosition(r2, c2)) {
+                if (game.getBoard()[r1][c1] == '\0' || game.getBoard()[r2][c2] == '\0') {
+                    opportunities++;
+                }
+            }
+        }
+        return opportunities;
+    }
+
     @Override
     public PlayerType getType() {
         return PlayerType.COMPUTER_HARD;
@@ -379,7 +441,7 @@ public abstract class SOSGameLogic implements Game {
         lastSOSCoordinates.add(new int[]{r3, c3});
     }
 
-    private boolean isValidPosition(int row, int col) {
+    protected boolean isValidPosition(int row, int col) {
         return row >= 0 && row < size && col >= 0 && col < size;
     }
 
